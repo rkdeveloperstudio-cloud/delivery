@@ -19,9 +19,9 @@ const SHELL_ASSETS = [
   './icon-128.png',
   './icon-144.png',
   './icon-152.png',
-  './icon-192.png',
+  './icon-192.PNG',
   './icon-384.png',
-  './icon-512.png',
+  './icon-512.PNG',
   './icon-192-maskable.png',
   './icon-512-maskable.png'
 ];
