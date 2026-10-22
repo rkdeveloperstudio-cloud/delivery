@@ -5,13 +5,14 @@
    - Supabase API: network-only, with empty [] fallback
    ============================================================ */
 
-const VERSION = 'v1.0.0';
+const VERSION = 'v1.0.1';
 const SHELL_CACHE = `delivery-shell-${VERSION}`;
 const RUNTIME_CACHE = `delivery-runtime-${VERSION}`;
 
 const SHELL_ASSETS = [
   './',
   './index.html',
+  './search.html',
   './manifest.json',
   './icon-72.png',
   './icon-96.png',
@@ -69,9 +70,14 @@ self.addEventListener('fetch', event => {
   }
 
   // 2) Same-origin navigation → serve cached shell
+  //    Try the exact page first, fall back to index.html
   if (req.mode === 'navigate') {
     event.respondWith(
-      caches.match('./index.html').then(cached => cached || fetch(req))
+      caches.match(req).then(cached => {
+        if (cached) return cached;
+        // If the exact page isn't cached, fall back to index.html
+        return caches.match('./index.html').then(fallback => fallback || fetch(req));
+      })
     );
     return;
   }

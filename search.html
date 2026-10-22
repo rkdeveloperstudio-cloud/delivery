@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<!-- Prevent zoom: viewport with user-scalable=no + maximum-scale=1 -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Delivery Search</title>
+<meta name="theme-color" content="#0f172a" />
+<meta name="description" content="Search delivery records" />
+
+<!-- iOS PWA meta -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Delivery" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="format-detection" content="telephone=no" />
+
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+
+<style>
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-hover: #334155;
+  --border: #334155;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --accent: #38bdf8;
+  --accent-dim: #0ea5e9;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --radius: 12px;
+  --radius-sm: 8px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Disable zoom via touch — pinch and double-tap */
+html {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  -ms-text-size-adjust: 100%;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Allow text selection only on values that users might copy */
+input, textarea { user-select: text; -webkit-user-select: text; }
+
+/* Prevent pull-to-refresh on mobile browsers */
+body { overscroll-behavior: none; }
+
+/* Header */
+.header {
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top);
+}
+.header-inner {
+  max-width: 760px; margin: 0 auto;
+  padding: 16px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+}
+.header-left {
+  display: flex; align-items: center; gap: 12px;
+  min-width: 0;
+}
+.logo {
+  font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+.home-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+.home-btn:hover { background: var(--surface-hover); border-color: var(--accent); color: var(--accent); }
+.home-btn svg { width: 18px; height: 18px; }
+.badge {
+  font-size: 0.7rem; font-weight: 600;
+  padding: 4px 10px; border-radius: 999px;
+  background: var(--surface); color: var(--text-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.badge.online { color: var(--success); border-color: rgba(34,197,94,0.3); }
+.badge.offline { color: var(--danger); border-color: rgba(239,68,68,0.3); }
+
+.main { max-width: 760px; margin: 0 auto; padding: 16px 20px 40px; }
+
+.filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+.filters-title {
+  font-size: 0.85rem; font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.05em; margin-bottom: 12px;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.filter-grid .full { grid-column: 1 / -1; }
+.filter-group label {
+  display: block; font-size: 0.75rem;
+  color: var(--text-muted); margin-bottom: 4px;
+  font-weight: 500;
+}
+.filter-group input,
+.filter-group select {
+  width: 100%; padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;  /* 16px prevents iOS auto-zoom on focus */
+  outline: none;
+  transition: border-color 0.2s;
+}
+.filter-group input:focus,
+.filter-group select:focus { border-color: var(--accent); }
+.filter-group input::placeholder { color: #64748b; }
+
+.filter-actions {
+  display: flex; gap: 10px; margin-top: 14px;
+}
+.btn {
+  flex: 1; padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.95rem; font-weight: 500;
+  cursor: pointer; transition: background 0.2s, border-color 0.2s;
+  touch-action: manipulation;
+}
+.btn:hover { background: var(--surface-hover); }
+.btn.primary {
+  background: var(--accent); border-color: var(--accent);
+  color: #0f172a; font-weight: 600;
+}
+.btn.primary:hover { background: var(--accent-dim); }
+
+.results-info {
+  font-size: 0.8rem; color: var(--text-muted);
+  margin-bottom: 12px; padding-left: 4px;
+}
+.results-list {
+  display: flex; flex-direction: column; gap: 10px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.1s;
+  animation: fadeIn 0.3s ease;
+  touch-action: manipulation;
+}
+.card:active { transform: scale(0.985); }
+.card:hover { border-color: var(--accent-dim); }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+.card-top {
+  display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 10px;
+}
+.card-bill { font-weight: 700; font-size: 0.95rem; color: var(--accent); }
+.card-status {
+  font-size: 0.68rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.status-processing { background: rgba(56,189,248,0.15); color: #38bdf8; }
+.status-cancelled  { background: rgba(239,68,68,0.15);  color: #ef4444; }
+.status-received   { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.status-pending    { background: rgba(250,204,21,0.15); color: #facc15; }
+.status-default    { background: rgba(148,163,184,0.15); color: #94a3b8; }
+
+.card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 14px;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.card-body .field { display: flex; flex-direction: column; }
+.card-body .field .k { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: #64748b; }
+.card-body .field .v { color: var(--text); font-weight: 500; word-break: break-word; }
+.card-amount {
+  font-size: 1.2rem; font-weight: 800;
+  color: var(--success); margin-top: 12px;
+  text-align: right; letter-spacing: -0.02em;
+}
+
+.empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+.empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.4; }
+.hidden { display: none !important; }
+
+.load-more {
+  width: 100%; padding: 14px; margin-top: 16px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+  background: transparent; color: var(--text-muted);
+  font-size: 0.9rem; cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  touch-action: manipulation;
+}
+.load-more:hover { border-color: var(--accent); color: var(--accent); }
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.modal {
+  background: var(--surface);
+  width: 100%; max-width: 760px;
+  max-height: 85dvh;
+  border-radius: var(--radius) var(--radius) 0 0;
+  overflow-y: auto;
+  animation: slideUp 0.3s ease;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.modal-header h2 { font-size: 1.1rem; }
+.close-btn {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 1.6rem; cursor: pointer; line-height: 1;
+  padding: 4px 8px;
+  touch-action: manipulation;
+}
+.modal-body { padding: 20px; }
+.detail-row {
+  display: flex; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.detail-row:last-child { border-bottom: none; }
+.detail-row .label { color: var(--text-muted); }
+.detail-row .value { color: var(--text); font-weight: 500; text-align: right; max-width: 60%; word-break: break-word; }
+
+.offline-banner {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--danger); color: white; text-align: center;
+  padding: 10px; font-size: 0.85rem; font-weight: 500;
+  z-index: 50;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+  .modal-overlay { align-items: center; }
+  .modal { border-radius: var(--radius); max-height: 80dvh; }
+}
+@media (max-width: 420px) {
+  .filter-grid { grid-template-columns: 1fr; }
+  .card-body { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="header-left">
+      <a href="index.html" class="home-btn" aria-label="Back to dashboard" title="Back to dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9.5L12 3l9 6.5"/>
+          <path d="M5 10v10h14V10"/>
+          <path d="M9 20v-6h6v6"/>
+        </svg>
+      </a>
+      <h1 class="logo">QC Delivery</h1>
+    </div>
+    <span class="badge" id="statusBadge">Online</span>
+  </div>
+</header>
+
+<main class="main">
+
+  <section class="filters">
+    <div class="filters-title">Filters</div>
+    <div class="filter-grid">
+      <div class="filter-group">
+        <label for="fStatus">Status</label>
+        <select id="fStatus">
+          <option value="">All</option>
+          <option value="PROCESSING">PROCESSING</option>
+          <option value="CANCELLED">CANCELLED</option>
+          <option value="RECEIVED">RECEIVED</option>
+          <option value="PENDING">PENDING</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="fId">HOLD NO.</label>
+        <input type="number" id="fId" placeholder="e.g. 1024" inputmode="numeric" />
+      </div>
+      <div class="filter-group">
+        <label for="fDateFrom">Date From</label>
+        <input type="date" id="fDateFrom" />
+      </div>
+      <div class="filter-group">
+        <label for="fDateTo">Date To</label>
+        <input type="date" id="fDateTo" />
+      </div>
+      <div class="filter-group">
+        <label for="fAmountMin">Min Amount</label>
+        <input type="number" id="fAmountMin" placeholder="0" inputmode="decimal" step="0.01" />
+      </div>
+      <div class="filter-group">
+        <label for="fAmountMax">Max Amount</label>
+        <input type="number" id="fAmountMax" placeholder="∞" inputmode="decimal" step="0.01" />
+      </div>
+      <div class="filter-group">
+        <label for="fBill">Bill Number</label>
+        <input type="text" id="fBill" placeholder="Bill number" />
+      </div>
+      <div class="filter-group">
+        <label for="fCargoId">Cargo ID</label>
+        <input type="number" id="fCargoId" placeholder="e.g. 55" inputmode="numeric" />
+      </div>
+      <div class="filter-group full">
+        <label for="fCounter">Counter</label>
+        <input type="text" id="fCounter" placeholder="Counter name" />
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="btn" id="resetBtn">Reset</button>
+      <button class="btn primary" id="searchBtn">Search</button>
+    </div>
+  </section>
+
+  <div class="results-info" id="resultsInfo">Loading...</div>
+  <section id="resultsList" class="results-list"></section>
+
+  <div id="emptyState" class="empty-state hidden">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+    </svg>
+    <p>No records match your filters</p>
+  </div>
+
+  <button id="loadMoreBtn" class="load-more hidden">Load More</button>
+</main>
+
+<div id="detailModal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Record Detail</h2>
+      <button id="closeModal" class="close-btn">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div id="offlineBanner" class="offline-banner hidden">You are offline — showing cached results</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const SUPABASE_URL = 'https://qikauwgsqsylseitsoxh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpa2F1d2dzcXN5bHNlaXRzb3hoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3MTc4NjcsImV4cCI6MjA5MDI5Mzg2N30.f4xQpdDIQnfg3ekKnWN6lbvHcnfLVlvmkBCK-8WwDzU';
+const TABLE = 'delivery_records';
+const PAGE_SIZE = 20;
+const DEFAULT_DATE_RANGE_DAYS = 30;
+
+/* ============================================================
+   State
+   ============================================================ */
+let allRecords = [];
+let filteredRecords = [];
+let displayedCount = 0;
+let isLoading = false;
+let isOnline = navigator.onLine;
+
+/* ============================================================
+   DOM
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const fStatus   = $('fStatus');
+const fId       = $('fId');
+const fDateFrom = $('fDateFrom');
+const fDateTo   = $('fDateTo');
+const fAmountMin= $('fAmountMin');
+const fAmountMax= $('fAmountMax');
+const fBill     = $('fBill');
+const fCargoId  = $('fCargoId');
+const fCounter  = $('fCounter');
+const searchBtn = $('searchBtn');
+const resetBtn  = $('resetBtn');
+const resultsInfo = $('resultsInfo');
+const resultsList = $('resultsList');
+const emptyState  = $('emptyState');
+const loadMoreBtn = $('loadMoreBtn');
+const statusBadge = $('statusBadge');
+const offlineBanner = $('offlineBanner');
+const detailModal = $('detailModal');
+const modalBody   = $('modalBody');
+const closeModal  = $('closeModal');
+
+/* ============================================================
+   Date helpers
+   ============================================================ */
+function toISODate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function applyDefaultDateRange() {
+  const today = new Date();
+  const from = new Date();
+  from.setDate(today.getDate() - DEFAULT_DATE_RANGE_DAYS);
+  fDateFrom.value = toISODate(from);
+  fDateTo.value   = toISODate(today);
+}
+
+/* ============================================================
+   Fetch from Supabase
+   ============================================================ */
+async function fetchRecords() {
+  if (isLoading) return;
+  isLoading = true;
+  resultsInfo.textContent = 'Loading records...';
+
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/${TABLE}?select=*&order=id.desc&limit=5000`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    allRecords = await res.json();
+
+    try { localStorage.setItem('delivery_records_cache', JSON.stringify(allRecords)); } catch(e) {}
+
+    setStatus('online');
+    applyFilters();
+  } catch (err) {
+    console.error('Fetch failed:', err);
+    const cached = localStorage.getItem('delivery_records_cache');
+    if (cached) {
+      allRecords = JSON.parse(cached);
+      applyFilters();
+      resultsInfo.textContent = 'Showing cached results (offline)';
+    } else {
+      resultsInfo.textContent = 'Failed to load data. Check connection.';
+    }
+    setStatus('offline');
+  } finally {
+    isLoading = false;
+  }
+}
+
+/* ============================================================
+   Filters
+   ============================================================ */
+function applyFilters() {
+  const status   = fStatus.value.trim().toUpperCase();
+  const idVal    = fId.value.trim();
+  const dateFrom = fDateFrom.value ? new Date(fDateFrom.value) : null;
+  const dateTo   = fDateTo.value ? new Date(fDateTo.value + 'T23:59:59') : null;
+  const amtMin   = fAmountMin.value !== '' ? parseFloat(fAmountMin.value) : null;
+  const amtMax   = fAmountMax.value !== '' ? parseFloat(fAmountMax.value) : null;
+  const bill     = fBill.value.trim().toLowerCase();
+  const cargoId  = fCargoId.value.trim();
+  const counter  = fCounter.value.trim().toLowerCase();
+
+  filteredRecords = allRecords.filter(r => {
+    if (status && (r.status || '').toUpperCase() !== status) return false;
+    if (idVal && String(r.id) !== idVal) return false;
+
+    if (dateFrom || dateTo) {
+      const dates = [r.process_date, r.send_date, r.bill_date]
+        .map(d => d ? new Date(d) : null)
+        .filter(d => d && !isNaN(d.getTime()));
+
+      const inRange = dates.some(d =>
+        (!dateFrom || d >= dateFrom) && (!dateTo || d <= dateTo)
+      );
+      if (!inRange) return false;
+    }
+
+    const amt = r.amount !== null && r.amount !== undefined ? Number(r.amount) : null;
+    if (amtMin !== null && (amt === null || amt < amtMin)) return false;
+    if (amtMax !== null && (amt === null || amt > amtMax)) return false;
+
+    if (bill && !(r.bill_number || '').toLowerCase().includes(bill)) return false;
+    if (cargoId && String(r.cargo_id) !== cargoId) return false;
+    if (counter && !(r.counter || '').toLowerCase().includes(counter)) return false;
+
+    return true;
+  });
+
+  displayedCount = 0;
+  resultsList.innerHTML = '';
+  loadMoreBtn.classList.add('hidden');
+  emptyState.classList.add('hidden');
+
+  if (filteredRecords.length === 0) {
+    resultsInfo.textContent = 'No records match your filters';
+    emptyState.classList.remove('hidden');
+    return;
+  }
+
+  resultsInfo.textContent = `${filteredRecords.length} record${filteredRecords.length > 1 ? 's' : ''} found`;
+  renderMore();
+}
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+function renderMore() {
+  const next = filteredRecords.slice(displayedCount, displayedCount + PAGE_SIZE);
+  next.forEach(r => resultsList.appendChild(createCard(r)));
+  displayedCount += next.length;
+  loadMoreBtn.classList.toggle('hidden', displayedCount >= filteredRecords.length);
+}
+
+function createCard(r) {
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const statusClass = (() => {
+    const s = (r.status || '').toUpperCase();
+    if (s === 'PROCESSING') return 'status-processing';
+    if (s === 'CANCELLED')  return 'status-cancelled';
+    if (s === 'RECEIVED')   return 'status-received';
+    if (s === 'PENDING')    return 'status-pending';
+    return 'status-default';
+  })();
+
+  card.innerHTML = `
+    <div class="card-top">
+      <span class="card-bill">${esc(r.bill_number || '—')}</span>
+      <span class="card-status ${statusClass}">${esc(r.status || '—')}</span>
+    </div>
+    <div class="card-body">
+      <div class="field"><span class="k">ID</span><span class="v">${esc(r.id)}</span></div>
+      <div class="field"><span class="k">Cargo ID</span><span class="v">${esc(r.cargo_id ?? '—')}</span></div>
+      <div class="field"><span class="k">Counter</span><span class="v">${esc(r.counter || '—')}</span></div>
+      <div class="field"><span class="k">Cargo</span><span class="v">${esc(r.cargo || '—')}</span></div>
+      <div class="field"><span class="k">Process Date</span><span class="v">${esc(r.process_date || '—')}</span></div>
+      <div class="field"><span class="k">Sent Date</span><span class="v">${esc(r.send_date || '—')}</span></div>
+      <div class="field"><span class="k">Bill Date</span><span class="v">${esc(r.bill_date || '—')}</span></div>
+      <div class="field"><span class="k">Bill No.</span><span class="v">${esc(r.bill_number || '—')}</span></div>
+    </div>
+    <div class="card-amount">${fmtAmount(r.amount)}</div>
+  `;
+  card.addEventListener('click', () => openDetail(r));
+  return card;
+}
+
+function fmtAmount(v) {
+  if (v === null || v === undefined) return '—';
+  return Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+/* ============================================================
+   Modal
+   ============================================================ */
+function openDetail(r) {
+  const rows = [
+    ['ID', r.id],
+    ['Cargo ID', r.cargo_id],
+    ['Counter', r.counter],
+    ['Cargo', r.cargo],
+    ['Amount', fmtAmount(r.amount)],
+    ['Process Date', r.process_date],
+    ['Sent Date', r.send_date],
+    ['Bill Date', r.bill_date],
+    ['Bill Number', r.bill_number],
+    ['Status', r.status],
+  ];
+
+  modalBody.innerHTML = rows
+    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => `
+      <div class="detail-row">
+        <span class="label">${esc(k)}</span>
+        <span class="value">${esc(v)}</span>
+      </div>
+    `).join('');
+
+  detailModal.classList.remove('hidden');
+}
+
+closeModal.addEventListener('click', () => detailModal.classList.add('hidden'));
+detailModal.addEventListener('click', e => {
+  if (e.target === detailModal) detailModal.classList.add('hidden');
+});
+
+/* ============================================================
+   Events
+   ============================================================ */
+searchBtn.addEventListener('click', applyFilters);
+
+resetBtn.addEventListener('click', () => {
+  fStatus.value = '';
+  fId.value = '';
+  fAmountMin.value = '';
+  fAmountMax.value = '';
+  fBill.value = '';
+  fCargoId.value = '';
+  fCounter.value = '';
+  applyDefaultDateRange();
+  applyFilters();
+});
+
+[fStatus, fId, fDateFrom, fDateTo, fAmountMin, fAmountMax, fBill, fCargoId, fCounter]
+  .forEach(el => el.addEventListener('input', () => {
+    clearTimeout(window.__filterTimer);
+    window.__filterTimer = setTimeout(applyFilters, 200);
+  }));
+
+loadMoreBtn.addEventListener('click', renderMore);
+
+/* ============================================================
+   Online / Offline
+   ============================================================ */
+function setStatus(s) {
+  isOnline = s === 'online';
+  statusBadge.textContent = isOnline ? 'Online' : 'Offline';
+  statusBadge.className = 'badge ' + (isOnline ? 'online' : 'offline');
+  offlineBanner.classList.toggle('hidden', isOnline);
+}
+
+window.addEventListener('online', () => { setStatus('online'); fetchRecords(); });
+window.addEventListener('offline', () => setStatus('offline'));
+
+/* ============================================================
+   Prevent pinch-zoom and double-tap zoom (extra layer)
+   ============================================================ */
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', e => {
+  const now = Date.now();
+  if (now - lastTouchEnd <= 300) e.preventDefault();  // block double-tap zoom
+  lastTouchEnd = now;
+}, { passive: false });
+
+/* ============================================================
+   Service Worker
+   ============================================================ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        if (!newSW) return;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            console.log('New version available — refresh to update');
+          }
+        });
+      });
+    }).catch(err => console.warn('SW registration failed:', err));
+  });
+}
+
+/* ============================================================
+   Init
+   ============================================================ */
+applyDefaultDateRange();
+setStatus(navigator.onLine ? 'online' : 'offline');
+fetchRecords();
+</script>
+</body>
+</html>
